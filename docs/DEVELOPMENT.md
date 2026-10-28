@@ -26,7 +26,7 @@ All participants should use the same plugin version. Progress messages include t
 
 Each client tracks its own loot and shares match updates through RuneLite's Party service. Wise Old Man lookups are opt-in and request only the local player's baseline.
 
-The plugin depends on RuneLite's built-in Loot Tracker to receive personal NPC loot and reward-chest events. Its default wheel uses `BossCatalog`: Barrows rewards come from the Barrows chest, Moons of Peril from the Lunar Chest, and raids from their named reward chests. Boss variants such as normal and Corrupted Gauntlet keep separate wheel entries. Custom wheel names still match loot events with the same name. Pet goals use game chat messages and need manual attribution checks.
+Keep RuneLite's built-in Loot Tracker enabled to receive personal NPC loot and reward-chest events. Its default wheel uses `BossCatalog`: Barrows rewards come from the Barrows chest, Moons of Peril from the Lunar Chest, and raids from their named reward chests. Boss variants such as normal and Corrupted Gauntlet keep separate wheel entries. Custom wheel names still match loot events with the same name. Pet goals use game chat messages and need manual attribution checks.
 
 ## Manual testing
 

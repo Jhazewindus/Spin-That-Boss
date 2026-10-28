@@ -17,7 +17,7 @@ Spin That Boss turns bossing with friends into a shared challenge. Let the wheel
 ## Getting started
 
 1. Enable RuneLite's **Party** plugin. Create a party and share its passphrase with your friends.
-2. Have everyone join the same party and enable **Spin That Boss**.
+2. Have everyone join the same party and enable **Spin That Boss** and RuneLite's built-in **Loot Tracker**.
 3. In the plugin settings, set **Bosses in wheel** and **Leg goal**. A leg is one round of the challenge.
 4. Open the Spin That Boss sidebar. One player clicks **Start match** to become the host, then **Spin the wheel**.
 5. Go bossing! Once the goal is met, the host can spin for the next round or use **End match** to finish.

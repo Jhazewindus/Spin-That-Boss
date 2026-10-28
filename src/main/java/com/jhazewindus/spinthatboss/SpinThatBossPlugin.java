@@ -22,9 +22,7 @@ import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.PartyChanged;
 import net.runelite.api.events.NpcSpawned;
 import net.runelite.client.game.ItemManager;
-import net.runelite.client.plugins.PluginDependency;
 import net.runelite.client.plugins.loottracker.LootReceived;
-import net.runelite.client.plugins.loottracker.LootTrackerPlugin;
 import net.runelite.client.party.PartyMember;
 import net.runelite.client.party.PartyService;
 import net.runelite.client.party.WSClient;
@@ -43,7 +41,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import net.runelite.http.api.loottracker.LootRecordType;
 
-@PluginDependency(LootTrackerPlugin.class)
 @PluginDescriptor(
 	name = "Spin That Boss",
 	configName = "spin-that-boss",
@@ -89,6 +86,7 @@ public class SpinThatBossPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
+		log.info("Spin That Boss started");
 		wsClient.registerMessage(MatchMessage.class);
 		loadSavedMatch();
 		panel = new SpinThatBossPanel(this::startMatch, this::spin, this::endMatch);

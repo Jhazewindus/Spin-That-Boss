@@ -9,7 +9,7 @@ Spin That Boss turns bossing with friends into a shared challenge. Let the wheel
 ## What it does
 
 - **Your own boss wheel** — choose the bosses your group wants to fight. Each boss comes up once before the wheel reshuffles.
-- **Bosses ready to pick** — the starting wheel includes bosses and activities with unique loot. Raids, Barrows, and Moons each have one entry; other boss variants stay separate. Edit the list to suit your group.
+- **Bosses ready to pick** — search and tick bosses in the sidebar, or use **Select all**. Raids, Barrows, and Moons each have one entry; other boss variants stay separate.
 - **Shared challenges** — race for a rare drop, chase a pet, or set a kill-count or loot-value target.
 - **Party progress** — see everyone's kills, tracked rare drops, and loot value alongside the current boss and goal.
 - **Match history** — look back at completed rounds and keep your progress between sessions.
@@ -18,29 +18,31 @@ Spin That Boss turns bossing with friends into a shared challenge. Let the wheel
 
 1. Enable RuneLite's **Party** plugin. Create a party and share its passphrase with your friends.
 2. Have everyone join the same party and enable **Spin That Boss** and RuneLite's built-in **Loot Tracker**.
-3. In the plugin settings, set **Bosses in wheel** and **Leg goal**. A leg is one round of the challenge.
-4. Open the Spin That Boss sidebar. One player clicks **Start match** to become the host, then **Spin the wheel**.
-5. Go bossing! Once the goal is met, the host can spin for the next round or use **End match** to finish.
+3. Open the Spin That Boss sidebar. One player clicks **Setup run**, chooses the bosses and a goal, then clicks **Start run** to become the host. A leg is one round of the challenge.
+4. The host clicks **Spin the wheel** to pick the first boss.
+5. Go bossing! Once the goal is met, the host can spin for the next round or use **End run** to finish.
 
 The boss list is locked when the match starts. Only the host can spin or end the match. Keep everyone on the same plugin version, and rejoin the same party to pick up a saved match.
 
+Run choices live in the Spin That Boss sidebar. The plugin settings contain only the optional Wise Old Man baseline toggle.
+
 ## Choose your challenge
 
-Enter one of these values in **Leg goal**:
+Choose a goal from the dropdown in **Setup run**:
 
-| Challenge | Setting |
+| Challenge | What completes a leg |
 | --- | --- |
-| First player to get a chosen rare drop | `FIRST_RARE` |
-| Everyone gets a chosen rare drop | `EVERYONE_RARE` |
-| First player to get a pet | `FIRST_PET` |
-| Everyone gets a pet | `EVERYONE_PET` |
-| First player to reach the kill target | `FIRST_KILLS` |
-| Everyone reaches the kill target | `KILLS_EACH` |
-| First player to reach the loot-value target | `FIRST_VALUE` |
+| First to chosen rare drop | One member gets a drop listed for the current boss |
+| Everyone gets chosen rare | Every member gets a listed drop |
+| First to pet | One member gets a pet |
+| Everyone gets pet | Every member gets a pet |
+| First to kill target | One member reaches the selected number of kills |
+| Everyone reaches kill target | Every member reaches the selected number of kills |
+| First to loot-value target | One member's drops for this boss reach the GP target |
 
-Use **Kills per member** to set the kill target, or **Drop value target** for the GP target. Loot value uses Grand Exchange prices.
+The setup menu shows **Kills needed** or **Loot value needed (GP)** when that goal uses a target. Loot value adds up the tracked drops for the current boss using Grand Exchange prices; the sidebar shows each member's progress against the target.
 
-The starting goal is **first player to reach the kill target**. For rare-drop challenges, everyone should use the same **Rare items by boss** list. Add a line for each boss in your wheel, separating drops with `|`:
+The starting goal is **first to kill target**. For rare-drop challenges, the host enters **Rare drops** in setup and shares that list with the party. Add a line for each boss in your wheel, separating drops with `|`:
 
 ```text
 Zulrah: Tanzanite fang | Magic fang | Serpentine visage

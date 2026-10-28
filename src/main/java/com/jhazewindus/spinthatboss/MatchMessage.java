@@ -8,5 +8,6 @@ public class MatchMessage extends PartyMemberMessage
 	public MatchState state;
 	public String matchId;
 	public String boss;
+	public int legNumber;
 	public PlayerProgress memberProgress;
 }

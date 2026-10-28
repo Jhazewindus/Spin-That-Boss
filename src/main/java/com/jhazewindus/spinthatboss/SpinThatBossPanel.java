@@ -4,7 +4,6 @@ import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridLayout;
-import java.util.function.Consumer;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -12,8 +11,9 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.SwingConstants;
+import net.runelite.client.ui.PluginPanel;
 
-final class SpinThatBossPanel extends JPanel
+final class SpinThatBossPanel extends PluginPanel
 {
 	private final JLabel partyLabel = new JLabel("Not in a RuneLite party", SwingConstants.CENTER);
 	private final JLabel matchLabel = new JLabel("No match running", SwingConstants.CENTER);
@@ -27,7 +27,8 @@ final class SpinThatBossPanel extends JPanel
 
 	SpinThatBossPanel(Runnable start, Runnable spin, Runnable end)
 	{
-		super(new BorderLayout(6, 6));
+		super(false);
+		setLayout(new BorderLayout(6, 6));
 		setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 		setPreferredSize(new Dimension(250, 480));
 

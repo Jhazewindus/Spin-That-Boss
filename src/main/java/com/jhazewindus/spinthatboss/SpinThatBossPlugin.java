@@ -27,6 +27,7 @@ import net.runelite.client.party.PartyMember;
 import net.runelite.client.party.PartyService;
 import net.runelite.client.party.WSClient;
 import net.runelite.client.party.events.UserJoin;
+import net.runelite.client.party.messages.PartyData;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
@@ -76,7 +77,8 @@ public class SpinThatBossPlugin extends Plugin
 	@Inject
 	private okhttp3.OkHttpClient httpClient;
 
-	private SpinThatBossPanel panel;
+	private volatile SpinThatBossPanel panel;
+	private Call baselineCall;
 	private NavigationButton navigationButton;
 	private MatchState match;
 	private final Map<Integer, Long> bossStartTimes = new HashMap<>();
@@ -102,8 +104,9 @@ public class SpinThatBossPlugin extends Plugin
 	}
 
 	@Override
-	protected void shutDown()
+	protected synchronized void shutDown()
 	{
+		cancelBaseline();
 		bossStartTimes.clear();
 		if (navigationButton != null)
 		{
@@ -123,6 +126,8 @@ public class SpinThatBossPlugin extends Plugin
 	@Subscribe
 	public synchronized void onPartyChanged(PartyChanged event)
 	{
+		cancelBaseline();
+		bossStartTimes.clear();
 		refreshPanel();
 		if (partyService.isInParty())
 		{
@@ -146,8 +151,37 @@ public class SpinThatBossPlugin extends Plugin
 	}
 
 	@Subscribe
+	public synchronized void onPartyData(PartyData event)
+	{
+		// Names arrive after UserJoin; never add RuneLite's <unknown> placeholder.
+		if (event.getCharacterName() == null || !partyService.isInParty())
+		{
+			return;
+		}
+		if (isLocalHost() && !match.ended)
+		{
+			PartyMember member = partyService.getMemberById(event.getMemberId());
+			if (member != null)
+			{
+				addMember(member);
+				persistMatch();
+				sendMatchState();
+			}
+		}
+		else
+		{
+			requestMatchSync();
+		}
+		refreshPanel();
+	}
+
+	@Subscribe
 	public synchronized void onMatchMessage(MatchMessage message)
 	{
+		if (!partyService.isInParty())
+		{
+			return;
+		}
 		if ("sync-request".equals(message.operation))
 		{
 			if (match != null && !match.ended && isLocalHost())
@@ -160,11 +194,24 @@ public class SpinThatBossPlugin extends Plugin
 		if ("state".equals(message.operation) && message.state != null)
 		{
 			PartyMember sender = partyService.getMemberById(message.getMemberId());
-			if (sender != null && samePlayer(sender.getDisplayName(), message.state.hostName)
-				&& message.state.partyId == partyService.getPartyId())
+			if (sender != null && MatchRules.acceptsState(match, message.state,
+				partyService.getPartyId(), sender.getDisplayName()))
 			{
+				PartyMember local = partyService.getLocalMember();
+				PlayerProgress localProgress = local == null ? null : MatchRules.retainLocalProgress(
+					match, message.state, playerKey(local.getDisplayName()));
+				if (match == null || !match.matchId.equals(message.state.matchId)
+					|| match.legNumber != message.state.legNumber || message.state.ended)
+				{
+					cancelBaseline();
+					bossStartTimes.clear();
+				}
 				match = message.state;
 				persistMatch();
+				if (localProgress != null && !match.ended && match.currentBoss != null && !isLocalHost())
+				{
+					sendProgress(localProgress);
+				}
 				refreshPanel();
 				fetchWiseOldManBaseline();
 			}
@@ -173,10 +220,8 @@ public class SpinThatBossPlugin extends Plugin
 
 		PartyMember sender = partyService.getMemberById(message.getMemberId());
 		String senderKey = sender == null ? null : playerKey(sender.getDisplayName());
-		if (!"progress".equals(message.operation) || message.memberProgress == null || senderKey == null
-			|| match == null || match.ended || !match.matchId.equals(message.matchId)
-			|| !sameBoss(match.currentBoss, message.boss)
-			|| !match.memberNames.contains(senderKey))
+		if (!"progress".equals(message.operation) || senderKey == null
+			|| !MatchRules.acceptsProgress(match, partyService.getPartyId(), senderKey, message))
 		{
 			return;
 		}
@@ -192,15 +237,15 @@ public class SpinThatBossPlugin extends Plugin
 	@Subscribe
 	public synchronized void onServerNpcLoot(ServerNpcLoot event)
 	{
-		if (match == null || match.ended || match.currentBoss == null || match.legComplete
-			|| !partyService.isInParty() || event.getComposition() == null || event.getItems() == null
+		if (!isMatchInParty() || match.ended || match.currentBoss == null || match.legComplete
+			|| event.getComposition() == null || event.getItems() == null
 			|| !sameBoss(match.currentBoss, event.getComposition().getName()))
 		{
 			return;
 		}
 
 		PartyMember localMember = partyService.getLocalMember();
-		if (localMember == null)
+		if (localMember == null || !MatchRules.validName(localMember.getDisplayName()))
 		{
 			return;
 		}
@@ -236,7 +281,7 @@ public class SpinThatBossPlugin extends Plugin
 	@Subscribe
 	public synchronized void onNpcSpawned(NpcSpawned event)
 	{
-		if (match != null && !match.ended && match.currentBoss != null
+		if (isMatchInParty() && !match.ended && !match.legComplete && match.currentBoss != null
 			&& sameBoss(match.currentBoss, event.getNpc().getName()))
 		{
 			bossStartTimes.put(event.getNpc().getIndex(), System.nanoTime());
@@ -246,7 +291,7 @@ public class SpinThatBossPlugin extends Plugin
 	@Subscribe
 	public synchronized void onChatMessage(ChatMessage event)
 	{
-		if (match == null || match.ended || match.currentBoss == null
+		if (!isMatchInParty() || match.ended || match.legComplete || match.currentBoss == null
 			|| event.getType() != ChatMessageType.GAMEMESSAGE || event.getMessage() == null)
 		{
 			return;
@@ -258,7 +303,7 @@ public class SpinThatBossPlugin extends Plugin
 			return;
 		}
 		PartyMember localMember = partyService.getLocalMember();
-		if (localMember == null)
+		if (localMember == null || !MatchRules.validName(localMember.getDisplayName()))
 		{
 			return;
 		}
@@ -289,12 +334,12 @@ public class SpinThatBossPlugin extends Plugin
 
 	private synchronized void startMatch()
 	{
-		if (!partyService.isInParty())
+		if (!partyService.isInParty() || (isMatchInParty() && !match.ended))
 		{
 			return;
 		}
 		PartyMember host = partyService.getLocalMember();
-		if (host == null)
+		if (host == null || !MatchRules.validName(host.getDisplayName()))
 		{
 			return;
 		}
@@ -306,6 +351,8 @@ public class SpinThatBossPlugin extends Plugin
 			return;
 		}
 
+		cancelBaseline();
+		bossStartTimes.clear();
 		match = new MatchState();
 		match.matchId = UUID.randomUUID().toString();
 		match.partyId = partyService.getPartyId();
@@ -332,6 +379,7 @@ public class SpinThatBossPlugin extends Plugin
 			return;
 		}
 
+		cancelBaseline();
 		if (match.currentBoss != null)
 		{
 			match.history.add("Leg " + match.legNumber + ": " + match.currentBoss + " — " + legSummary());
@@ -368,6 +416,8 @@ public class SpinThatBossPlugin extends Plugin
 		{
 			return;
 		}
+		cancelBaseline();
+		bossStartTimes.clear();
 		match.ended = true;
 		if (match.currentBoss != null)
 		{
@@ -381,46 +431,7 @@ public class SpinThatBossPlugin extends Plugin
 
 	private void updateGoalCompletion()
 	{
-		if (match == null || match.currentBoss == null)
-		{
-			return;
-		}
-		if (RARE_GOAL_FIRST.equals(match.goalType))
-		{
-			match.legComplete = match.progress.values().stream()
-				.anyMatch(p -> !p.currentLegRareDrops.isEmpty());
-		}
-		else if (RARE_GOAL_EVERYONE.equals(match.goalType))
-		{
-			match.legComplete = !match.memberNames.isEmpty() && match.memberNames.stream()
-				.allMatch(name -> match.progress.containsKey(name)
-					&& !match.progress.get(name).currentLegRareDrops.isEmpty());
-		}
-		else if (PET_GOAL_FIRST.equals(match.goalType))
-		{
-			match.legComplete = match.progress.values().stream().anyMatch(p -> p.currentLegHasPet);
-		}
-		else if (PET_GOAL_EVERYONE.equals(match.goalType))
-		{
-			match.legComplete = !match.memberNames.isEmpty() && match.memberNames.stream()
-				.allMatch(name -> match.progress.containsKey(name) && match.progress.get(name).currentLegHasPet);
-		}
-		else if (KILL_GOAL_FIRST.equals(match.goalType))
-		{
-			match.legComplete = match.progress.values().stream()
-				.anyMatch(p -> p.currentLegKills >= match.killsPerMember);
-		}
-		else if (VALUE_GOAL_FIRST.equals(match.goalType))
-		{
-			match.legComplete = match.progress.values().stream()
-				.anyMatch(p -> p.currentLegDropValue >= match.valueTarget);
-		}
-		else
-		{
-			match.legComplete = !match.memberNames.isEmpty() && match.memberNames.stream()
-				.allMatch(name -> match.progress.containsKey(name)
-					&& match.progress.get(name).currentLegKills >= match.killsPerMember);
-		}
+		MatchRules.updateGoal(match);
 	}
 
 	private String legSummary()
@@ -440,6 +451,10 @@ public class SpinThatBossPlugin extends Plugin
 
 	private void addMember(PartyMember member)
 	{
+		if (!MatchRules.validName(member.getDisplayName()))
+		{
+			return;
+		}
 		String playerKey = playerKey(member.getDisplayName());
 		if (!match.memberNames.contains(playerKey))
 		{
@@ -464,22 +479,28 @@ public class SpinThatBossPlugin extends Plugin
 
 	private void sendProgress(PlayerProgress progress)
 	{
+		if (!isMatchInParty())
+		{
+			return;
+		}
 		MatchMessage message = new MatchMessage();
 		message.operation = "progress";
 		message.matchId = match.matchId;
 		message.boss = match.currentBoss;
+		message.legNumber = match.legNumber;
 		message.memberProgress = gson.fromJson(gson.toJson(progress), PlayerProgress.class);
 		partyService.send(message);
 	}
 
 	private synchronized void fetchWiseOldManBaseline()
 	{
-		if (!config.wiseOldManBaseline() || match == null || match.ended || match.currentBoss == null)
+		if (!config.wiseOldManBaseline() || !isMatchInParty() || match.ended
+			|| match.currentBoss == null || baselineCall != null)
 		{
 			return;
 		}
 		PartyMember localMember = partyService.getLocalMember();
-		if (localMember == null)
+		if (localMember == null || !MatchRules.validName(localMember.getDisplayName()))
 		{
 			return;
 		}
@@ -490,6 +511,7 @@ public class SpinThatBossPlugin extends Plugin
 		}
 
 		String matchId = match.matchId;
+		int legNumber = match.legNumber;
 		String boss = match.currentBoss;
 		String memberName = localMember.getDisplayName();
 		String metric = bossMetric(boss);
@@ -505,11 +527,13 @@ public class SpinThatBossPlugin extends Plugin
 			.header("User-Agent", "SpinThatBoss RuneLite plugin")
 			.get()
 			.build();
-		httpClient.newCall(request).enqueue(new Callback()
+		baselineCall = httpClient.newCall(request);
+		baselineCall.enqueue(new Callback()
 		{
 			@Override
 			public void onFailure(Call call, IOException exception)
 			{
+				finishBaseline(call);
 				log.debug("Wise Old Man baseline request failed", exception);
 			}
 
@@ -532,20 +556,26 @@ public class SpinThatBossPlugin extends Plugin
 					WiseOldManPlayer.BossScore score = player.latestSnapshot.data.bosses.get(metric);
 					if (score != null)
 					{
-						applyWiseOldManBaseline(matchId, boss, memberName, score.kills);
+						applyWiseOldManBaseline(call, matchId, legNumber, boss, memberName, score.kills);
 					}
 				}
 				catch (RuntimeException exception)
 				{
 					log.debug("Could not read Wise Old Man baseline response", exception);
 				}
+				finally
+				{
+					finishBaseline(call);
+				}
 			}
 		});
 	}
 
-	private synchronized void applyWiseOldManBaseline(String matchId, String boss, String memberName, int kills)
+	private synchronized void applyWiseOldManBaseline(Call call, String matchId, int legNumber, String boss, String memberName, int kills)
 	{
-		if (match == null || match.ended || !match.matchId.equals(matchId) || !sameBoss(match.currentBoss, boss))
+		if (panel == null || call.isCanceled() || !config.wiseOldManBaseline() || !isMatchInParty()
+			|| match.ended || !match.matchId.equals(matchId) || match.legNumber != legNumber
+			|| !sameBoss(match.currentBoss, boss))
 		{
 			return;
 		}
@@ -555,6 +585,23 @@ public class SpinThatBossPlugin extends Plugin
 		persistMatch();
 		sendProgress(progress);
 		refreshPanel();
+	}
+
+	private void cancelBaseline()
+	{
+		if (baselineCall != null)
+		{
+			baselineCall.cancel();
+			baselineCall = null;
+		}
+	}
+
+	private synchronized void finishBaseline(Call call)
+	{
+		if (baselineCall == call)
+		{
+			baselineCall = null;
+		}
 	}
 
 	private static String bossMetric(String boss)
@@ -580,7 +627,7 @@ public class SpinThatBossPlugin extends Plugin
 
 	private void sendMatchState()
 	{
-		if (match == null || !partyService.isInParty())
+		if (!isMatchInParty())
 		{
 			return;
 		}
@@ -588,6 +635,11 @@ public class SpinThatBossPlugin extends Plugin
 		message.operation = "state";
 		message.state = gson.fromJson(gson.toJson(match), MatchState.class);
 		partyService.send(message);
+	}
+
+	private boolean isMatchInParty()
+	{
+		return match != null && partyService.isInParty() && match.partyId == partyService.getPartyId();
 	}
 
 	private boolean isLocalHost()
@@ -614,7 +666,15 @@ public class SpinThatBossPlugin extends Plugin
 		}
 		try
 		{
-			match = gson.fromJson(saved, MatchState.class);
+			MatchState restored = gson.fromJson(saved, MatchState.class);
+			if (MatchRules.validState(restored))
+			{
+				match = restored;
+			}
+			else
+			{
+				log.debug("Ignoring incomplete saved Spin That Boss match state");
+			}
 		}
 		catch (JsonParseException ex)
 		{
@@ -685,7 +745,15 @@ public class SpinThatBossPlugin extends Plugin
 		}
 		String playerText = playerSummary.length() == 0 ? "Waiting for progress…" : playerSummary.toString().trim();
 		String historyText = historySummary.length() == 0 ? "No completed boss legs yet." : historySummary.toString();
-		SwingUtilities.invokeLater(() -> panel.showState(match, playerText, historyText, inParty, host));
+		SpinThatBossPanel targetPanel = panel;
+		MatchState snapshot = isMatchInParty() ? gson.fromJson(gson.toJson(match), MatchState.class) : null;
+		SwingUtilities.invokeLater(() ->
+		{
+			if (panel == targetPanel)
+			{
+				targetPanel.showState(snapshot, playerText, historyText, inParty, host);
+			}
+		});
 	}
 
 	private static String displayName(PlayerProgress progress)

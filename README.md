@@ -9,6 +9,7 @@ Spin That Boss turns bossing with friends into a shared challenge. Let the wheel
 ## What it does
 
 - **Your own boss wheel** — choose the bosses your group wants to fight. Each boss comes up once before the wheel reshuffles.
+- **Bosses ready to pick** — the starting wheel includes bosses and activities with unique loot. Raids, Barrows, and Moons each have one entry; other boss variants stay separate. Edit the list to suit your group.
 - **Shared challenges** — race for a rare drop, chase a pet, or set a kill-count or loot-value target.
 - **Party progress** — see everyone's kills, tracked rare drops, and loot value alongside the current boss and goal.
 - **Match history** — look back at completed rounds and keep your progress between sessions.
@@ -39,7 +40,7 @@ Enter one of these values in **Leg goal**:
 
 Use **Kills per member** to set the kill target, or **Drop value target** for the GP target. Loot value uses Grand Exchange prices.
 
-For rare-drop challenges, everyone should use the same **Rare items by boss** list. Add a line for each boss in your wheel, separating drops with `|`:
+The starting goal is **first player to reach the kill target**. For rare-drop challenges, everyone should use the same **Rare items by boss** list. Add a line for each boss in your wheel, separating drops with `|`:
 
 ```text
 Zulrah: Tanzanite fang | Magic fang | Serpentine visage

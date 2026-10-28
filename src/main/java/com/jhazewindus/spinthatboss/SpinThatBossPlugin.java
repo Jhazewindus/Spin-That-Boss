@@ -21,8 +21,10 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.PartyChanged;
 import net.runelite.api.events.NpcSpawned;
-import net.runelite.client.events.ServerNpcLoot;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.plugins.PluginDependency;
+import net.runelite.client.plugins.loottracker.LootReceived;
+import net.runelite.client.plugins.loottracker.LootTrackerPlugin;
 import net.runelite.client.party.PartyMember;
 import net.runelite.client.party.PartyService;
 import net.runelite.client.party.WSClient;
@@ -39,7 +41,9 @@ import okhttp3.Request;
 import okhttp3.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import net.runelite.http.api.loottracker.LootRecordType;
 
+@PluginDependency(LootTrackerPlugin.class)
 @PluginDescriptor(
 	name = "Spin That Boss",
 	configName = "spin-that-boss",
@@ -234,11 +238,11 @@ public class SpinThatBossPlugin extends Plugin
 	}
 
 	@Subscribe
-	public synchronized void onServerNpcLoot(ServerNpcLoot event)
+	public synchronized void onLootReceived(LootReceived event)
 	{
 		if (!isMatchInParty() || match.ended || match.currentBoss == null || match.legComplete
-			|| event.getComposition() == null || event.getItems() == null
-			|| !sameBoss(match.currentBoss, event.getComposition().getName()))
+			|| (event.getType() != LootRecordType.NPC && event.getType() != LootRecordType.EVENT)
+			|| event.getItems() == null || !BossCatalog.matchesLoot(match.currentBoss, event.getName()))
 		{
 			return;
 		}
@@ -250,8 +254,9 @@ public class SpinThatBossPlugin extends Plugin
 		}
 
 		PlayerProgress progress = getOrCreateProgress(localMember.getDisplayName());
-		progress.kills++;
-		progress.currentLegKills++;
+		int count = Math.max(1, event.getAmount());
+		progress.kills += count;
+		progress.currentLegKills += count;
 		for (net.runelite.client.game.ItemStack item : event.getItems())
 		{
 			String itemName = itemManager.getItemComposition(item.getId()).getName();
@@ -281,7 +286,7 @@ public class SpinThatBossPlugin extends Plugin
 	public synchronized void onNpcSpawned(NpcSpawned event)
 	{
 		if (isMatchInParty() && !match.ended && !match.legComplete && match.currentBoss != null
-			&& sameBoss(match.currentBoss, event.getNpc().getName()))
+			&& BossCatalog.matchesLoot(match.currentBoss, event.getNpc().getName()))
 		{
 			bossStartTimes.put(event.getNpc().getIndex(), System.nanoTime());
 		}
@@ -513,7 +518,7 @@ public class SpinThatBossPlugin extends Plugin
 		int legNumber = match.legNumber;
 		String boss = match.currentBoss;
 		String memberName = localMember.getDisplayName();
-		String metric = bossMetric(boss);
+		String metric = BossCatalog.wiseOldManMetric(boss);
 		HttpUrl url = new HttpUrl.Builder()
 			.scheme("https")
 			.host("api.wiseoldman.net")
@@ -601,20 +606,6 @@ public class SpinThatBossPlugin extends Plugin
 		{
 			baselineCall = null;
 		}
-	}
-
-	private static String bossMetric(String boss)
-	{
-		String metric = boss.trim().toLowerCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
-		if ("corrupted_gauntlet".equals(metric))
-		{
-			return "the_corrupted_gauntlet";
-		}
-		if ("gauntlet".equals(metric))
-		{
-			return "the_gauntlet";
-		}
-		return metric;
 	}
 
 	private void requestMatchSync()

@@ -26,11 +26,13 @@ All participants should use the same plugin version. Progress messages include t
 
 Each client tracks its own loot and shares match updates through RuneLite's Party service. Wise Old Man lookups are opt-in and request only the local player's baseline.
 
+The plugin depends on RuneLite's built-in Loot Tracker to receive personal NPC loot and reward-chest events. Its default wheel uses `BossCatalog`: Barrows rewards come from the Barrows chest, Moons of Peril from the Lunar Chest, and raids from their named reward chests. Boss variants such as normal and Corrupted Gauntlet keep separate wheel entries. Custom wheel names still match loot events with the same name. Pet goals use game chat messages and need manual attribution checks.
+
 ## Manual testing
 
 1. Use two clients in the same party, enable Spin That Boss, and start a match. Both panels should show the same host, boss, and goal. Only the host should be able to spin or end it.
 2. Set `FIRST_KILLS` to a small target. Confirm that only the assigned boss's personal loot increments your counter and that both clients see the progress. Finish a round and spin again: round counters should reset while match totals remain.
-3. Exercise every boss in the pool. Each refill should contain every boss once and should not immediately repeat the previous boss when the pool has more than one entry.
+3. Exercise every boss in the pool. Each refill should contain every boss once and should not immediately repeat the previous boss when the pool has more than one entry. Verify a raid reward chest, Barrows chest, and Lunar Chest each count once for their grouped activity.
 4. Join late, restart a client, disable/re-enable the plugin, and leave/rejoin the party. Confirm names, saved progress, and host controls recover. In another party, the old match must not collect or send progress.
 5. Check configured rare drops and pet goals. Pet recognition uses generic game chat text and can misattribute an unrelated pet to the assigned boss. Fastest times are spawn-to-loot estimates rather than official kill-time records.
 6. Leave Wise Old Man disabled for the core checks. When testing the optional lookup, use a tracked player and verify the current boss's baseline. Switch rounds or disable the plugin while a request is pending to check cancellation and stale-response handling.

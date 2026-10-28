@@ -14,7 +14,7 @@ public interface SpinThatBossConfig extends Config
 	)
 	default String bossPool()
 	{
-		return "Zulrah, Vorkath, Cerberus, Kraken";
+		return BossCatalog.defaultPool();
 	}
 
 	@ConfigItem(
@@ -24,7 +24,7 @@ public interface SpinThatBossConfig extends Config
 	)
 	default String goalType()
 	{
-		return "FIRST_RARE";
+		return "FIRST_KILLS";
 	}
 
 	@ConfigItem(

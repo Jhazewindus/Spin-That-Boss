@@ -89,7 +89,7 @@ public class SpinThatBossPlugin extends Plugin
 		log.info("Spin That Boss started");
 		wsClient.registerMessage(MatchMessage.class);
 		loadSavedMatch();
-		panel = new SpinThatBossPanel(this::startMatch, this::spin, this::endMatch);
+		panel = new SpinThatBossPanel(this::startMatch, this::spin, this::endMatch, initialSetup());
 		navigationButton = NavigationButton.builder()
 			.tooltip("Spin That Boss")
 			.icon(makeIcon())
@@ -334,7 +334,7 @@ public class SpinThatBossPlugin extends Plugin
 		}
 	}
 
-	private synchronized void startMatch()
+	private synchronized void startMatch(RunSetup setup)
 	{
 		if (!partyService.isInParty() || (isMatchInParty() && !match.ended))
 		{
@@ -346,7 +346,7 @@ public class SpinThatBossPlugin extends Plugin
 			return;
 		}
 
-		List<String> pool = BossWheel.parsePool(config.bossPool());
+		List<String> pool = new ArrayList<>(setup.bosses);
 		if (pool.isEmpty())
 		{
 			log.warn("Cannot start a boss match with an empty boss pool");
@@ -361,9 +361,10 @@ public class SpinThatBossPlugin extends Plugin
 		match.hostName = host.getDisplayName();
 		match.bossPool = pool;
 		match.remainingBosses = BossWheel.shuffledBag(pool, null);
-		match.goalType = normalizeGoal(config.goalType());
-		match.killsPerMember = Math.max(1, config.killsPerMember());
-		match.valueTarget = Math.max(1, config.valueTarget());
+		match.goalType = normalizeGoal(setup.goalType);
+		match.killsPerMember = Math.max(1, setup.killTarget);
+		match.valueTarget = Math.max(1L, setup.valueTarget);
+		match.rareItems = setup.rareItems;
 		for (PartyMember member : partyService.getMembers())
 		{
 			addMember(member);
@@ -670,6 +671,39 @@ public class SpinThatBossPlugin extends Plugin
 		}
 	}
 
+	private RunSetup initialSetup()
+	{
+		RunSetup setup = new RunSetup();
+		if (match != null)
+		{
+			setup.bosses = new ArrayList<>(match.bossPool);
+			setup.goalType = match.goalType;
+			setup.killTarget = match.killsPerMember;
+			setup.valueTarget = match.valueTarget;
+			setup.rareItems = match.rareItems == null ? legacySetting("rareItems", setup.rareItems) : match.rareItems;
+			return setup;
+		}
+		setup.bosses = BossWheel.parsePool(legacySetting("bossPool", BossCatalog.defaultPool()));
+		setup.goalType = normalizeGoal(legacySetting("goalType", "FIRST_KILLS"));
+		try
+		{
+			setup.killTarget = Math.max(1, Integer.parseInt(legacySetting("killsPerMember", "25")));
+			setup.valueTarget = Math.max(1L, Long.parseLong(legacySetting("valueTarget", "100000000")));
+		}
+		catch (NumberFormatException ex)
+		{
+			log.debug("Ignoring invalid old run target", ex);
+		}
+		setup.rareItems = legacySetting("rareItems", setup.rareItems);
+		return setup;
+	}
+
+	private String legacySetting(String key, String defaultValue)
+	{
+		String saved = configManager.getConfiguration(CONFIG_GROUP, key);
+		return saved == null ? defaultValue : saved;
+	}
+
 	private void refreshPanel()
 	{
 		if (panel == null)
@@ -691,8 +725,13 @@ public class SpinThatBossPlugin extends Plugin
 				}
 				playerSummary.append(displayName(progress))
 					.append("\nMatch kills: ").append(progress.kills)
-					.append("\nThis leg: ").append(progress.currentLegKills).append(" kills / ")
-					.append(progress.currentLegDropValue).append(" GP");
+					.append("\nThis leg: ").append(progress.currentLegKills).append(" kills")
+					.append("\nDrops: ").append(String.format(Locale.ROOT, "%,d", progress.currentLegDropValue))
+					.append(" GP");
+				if ("FIRST_VALUE".equals(match.goalType))
+				{
+					playerSummary.append(" / ").append(String.format(Locale.ROOT, "%,d", match.valueTarget)).append(" GP target");
+				}
 				if (progress.currentLegHasPet)
 				{
 					playerSummary.append("\nPet: got one this leg");
@@ -769,7 +808,8 @@ public class SpinThatBossPlugin extends Plugin
 		{
 			return false;
 		}
-		for (String line : config.rareItems().split("\\R"))
+		String configured = match.rareItems == null ? legacySetting("rareItems", new RunSetup().rareItems) : match.rareItems;
+		for (String line : configured.split("\\R"))
 		{
 			int separator = line.indexOf(':');
 			if (separator < 1 || !sameBoss(boss, line.substring(0, separator).trim()))

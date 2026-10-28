@@ -1,37 +1,86 @@
 package com.jhazewindus.spinthatboss;
 
 import java.awt.BorderLayout;
+import java.awt.CardLayout;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridLayout;
+import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.function.Consumer;
 import javax.swing.BorderFactory;
+import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JSpinner;
 import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingConstants;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import net.runelite.client.ui.PluginPanel;
 
 final class SpinThatBossPanel extends PluginPanel
 {
+	private static final GoalChoice[] GOALS = {
+		new GoalChoice("FIRST_KILLS", "First to kill target"),
+		new GoalChoice("KILLS_EACH", "Everyone reaches kill target"),
+		new GoalChoice("FIRST_VALUE", "First to loot-value target"),
+		new GoalChoice("FIRST_RARE", "First to chosen rare drop"),
+		new GoalChoice("EVERYONE_RARE", "Everyone gets chosen rare"),
+		new GoalChoice("FIRST_PET", "First to pet"),
+		new GoalChoice("EVERYONE_PET", "Everyone gets pet")
+	};
+
+	private final CardLayout cards = new CardLayout();
 	private final JLabel partyLabel = new JLabel("Not in a RuneLite party", SwingConstants.CENTER);
-	private final JLabel matchLabel = new JLabel("No match running", SwingConstants.CENTER);
+	private final JLabel matchLabel = new JLabel("No run running", SwingConstants.CENTER);
 	private final JLabel bossLabel = new JLabel("Current boss: —");
 	private final JLabel goalLabel = new JLabel("Goal: —");
 	private final JTextArea players = new JTextArea(8, 22);
 	private final JTextArea history = new JTextArea(6, 22);
-	private final JButton startButton = new JButton("Start match");
+	private final JButton setupButton = new JButton("Setup run");
 	private final JButton spinButton = new JButton("Spin the wheel");
-	private final JButton endButton = new JButton("End match");
+	private final JButton endButton = new JButton("End run");
+	private final JButton startButton = new JButton("Start run");
+	private final JLabel setupStatus = new JLabel(" ");
+	private final JTextField search = new JTextField();
+	private final JPanel bossChoices = new JPanel();
+	private final Map<String, JCheckBox> bossChecks = new LinkedHashMap<>();
+	private final JComboBox<GoalChoice> goalChoice = new JComboBox<>(GOALS);
+	private final JSpinner killTarget = new JSpinner(new SpinnerNumberModel(25, 1, Integer.MAX_VALUE, 1));
+	private final JSpinner valueTarget = new JSpinner(new SpinnerNumberModel(100_000_000L, 1L, Long.MAX_VALUE, 1_000_000L));
+	private final JPanel killRow = new JPanel(new BorderLayout(4, 2));
+	private final JPanel valueRow = new JPanel(new BorderLayout(4, 2));
+	private final JPanel rareRow = new JPanel(new BorderLayout(4, 2));
+	private final JTextArea rareItems = new JTextArea(4, 20);
+	private boolean inParty;
+	private boolean setupVisible;
 
-	SpinThatBossPanel(Runnable start, Runnable spin, Runnable end)
+	SpinThatBossPanel(Consumer<RunSetup> start, Runnable spin, Runnable end, RunSetup initial)
 	{
 		super(false);
-		setLayout(new BorderLayout(6, 6));
-		setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+		setLayout(cards);
 		setPreferredSize(new Dimension(250, 480));
+		add(createRunView(spin, end), "run");
+		add(createSetupView(start), "setup");
+		applySetup(initial);
+		cards.show(this, "run");
+	}
 
+	private JPanel createRunView(Runnable spin, Runnable end)
+	{
+		JPanel view = new JPanel(new BorderLayout(6, 6));
+		view.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 		JLabel title = new JLabel("Spin That Boss", SwingConstants.CENTER);
 		title.setFont(title.getFont().deriveFont(Font.BOLD, 16f));
 		JPanel header = new JPanel(new GridLayout(0, 1, 0, 4));
@@ -40,7 +89,7 @@ final class SpinThatBossPanel extends PluginPanel
 		header.add(matchLabel);
 		header.add(bossLabel);
 		header.add(goalLabel);
-		add(header, BorderLayout.NORTH);
+		view.add(header, BorderLayout.NORTH);
 
 		players.setEditable(false);
 		players.setLineWrap(true);
@@ -52,81 +101,246 @@ final class SpinThatBossPanel extends PluginPanel
 		details.add(new JLabel("Party cards"), BorderLayout.NORTH);
 		details.add(new JScrollPane(players), BorderLayout.CENTER);
 		JPanel historyPanel = new JPanel(new BorderLayout(4, 4));
-		historyPanel.add(new JLabel("Match history"), BorderLayout.NORTH);
+		historyPanel.add(new JLabel("Run history"), BorderLayout.NORTH);
 		historyPanel.add(new JScrollPane(history), BorderLayout.CENTER);
 		JPanel center = new JPanel(new GridLayout(2, 1, 0, 8));
 		center.add(details);
 		center.add(historyPanel);
-		add(center, BorderLayout.CENTER);
+		view.add(center, BorderLayout.CENTER);
 
-		startButton.addActionListener(e -> start.run());
+		setupButton.addActionListener(e -> openSetup());
 		spinButton.addActionListener(e -> spin.run());
 		endButton.addActionListener(e -> end.run());
 		JPanel actions = new JPanel(new GridLayout(0, 1, 0, 4));
-		actions.add(startButton);
+		actions.add(setupButton);
 		actions.add(spinButton);
 		actions.add(endButton);
-		add(actions, BorderLayout.SOUTH);
+		view.add(actions, BorderLayout.SOUTH);
+		return view;
 	}
 
-	void showParty(boolean inParty)
+	private JPanel createSetupView(Consumer<RunSetup> start)
 	{
-		partyLabel.setText(inParty ? "RuneLite party connected" : "Join a party in RuneLite's Party panel");
-		startButton.setEnabled(inParty);
+		JPanel view = new JPanel(new BorderLayout(6, 6));
+		view.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+		JLabel title = new JLabel("Setup run", SwingConstants.CENTER);
+		title.setFont(title.getFont().deriveFont(Font.BOLD, 16f));
+		JPanel top = new JPanel(new GridLayout(0, 1, 0, 4));
+		top.add(title);
+		top.add(new JLabel("Choose bosses for the wheel"));
+		search.setToolTipText("Search bosses");
+		top.add(search);
+		JPanel selection = new JPanel(new GridLayout(1, 2, 4, 0));
+		JButton selectAll = new JButton("Select all");
+		selectAll.addActionListener(e -> bossChecks.values().forEach(check -> check.setSelected(true)));
+		JButton clear = new JButton("Clear all");
+		clear.addActionListener(e -> bossChecks.values().forEach(check -> check.setSelected(false)));
+		selection.add(selectAll);
+		selection.add(clear);
+		top.add(selection);
+
+		bossChoices.setLayout(new BoxLayout(bossChoices, BoxLayout.Y_AXIS));
+		for (String boss : BossCatalog.bosses())
+		{
+			JCheckBox check = new JCheckBox(boss);
+			bossChecks.put(boss, check);
+			bossChoices.add(check);
+		}
+		search.getDocument().addDocumentListener(new DocumentListener()
+		{
+			@Override public void insertUpdate(DocumentEvent e) { filterBosses(); }
+			@Override public void removeUpdate(DocumentEvent e) { filterBosses(); }
+			@Override public void changedUpdate(DocumentEvent e) { filterBosses(); }
+		});
+		JScrollPane bossScroll = new JScrollPane(bossChoices);
+		bossScroll.setPreferredSize(new Dimension(220, 200));
+
+		JPanel options = new JPanel();
+		options.setLayout(new BoxLayout(options, BoxLayout.Y_AXIS));
+		options.add(new JLabel("Goal for each boss"));
+		options.add(goalChoice);
+		killRow.add(new JLabel("Kills needed"), BorderLayout.NORTH);
+		killRow.add(killTarget, BorderLayout.CENTER);
+		valueRow.add(new JLabel("Loot value needed (GP)"), BorderLayout.NORTH);
+		valueRow.add(valueTarget, BorderLayout.CENTER);
+		rareRow.add(new JLabel("Rare drops (Boss: Item | Item)"), BorderLayout.NORTH);
+		rareItems.setLineWrap(true);
+		rareItems.setWrapStyleWord(true);
+		rareRow.add(new JScrollPane(rareItems), BorderLayout.CENTER);
+		options.add(killRow);
+		options.add(valueRow);
+		options.add(rareRow);
+		goalChoice.addActionListener(e -> updateGoalFields());
+		JPanel middle = new JPanel(new BorderLayout(4, 6));
+		middle.add(bossScroll, BorderLayout.CENTER);
+		middle.add(options, BorderLayout.SOUTH);
+		JPanel content = new JPanel(new BorderLayout(4, 6));
+		content.add(top, BorderLayout.NORTH);
+		content.add(middle, BorderLayout.CENTER);
+		view.add(new JScrollPane(content), BorderLayout.CENTER);
+
+		startButton.addActionListener(e -> {
+			try
+			{
+				if (killRow.isVisible())
+				{
+					killTarget.commitEdit();
+				}
+				if (valueRow.isVisible())
+				{
+					valueTarget.commitEdit();
+				}
+			}
+			catch (ParseException ex)
+			{
+				setupStatus.setText("Enter a valid target number.");
+				return;
+			}
+			RunSetup setup = selectedSetup();
+			if (setup.bosses.isEmpty())
+			{
+				setupStatus.setText("Select at least one boss.");
+				return;
+			}
+			if (!inParty)
+			{
+				setupStatus.setText("Join a RuneLite party first.");
+				return;
+			}
+			setupStatus.setText(" ");
+			start.accept(setup);
+		});
+		JButton back = new JButton("Back");
+		back.addActionListener(e -> closeSetup());
+		JPanel bottom = new JPanel(new GridLayout(0, 1, 0, 3));
+		bottom.add(setupStatus);
+		bottom.add(startButton);
+		bottom.add(back);
+		view.add(bottom, BorderLayout.SOUTH);
+		return view;
+	}
+
+	private void filterBosses()
+	{
+		String query = search.getText().trim().toLowerCase(Locale.ROOT);
+		bossChecks.forEach((boss, check) -> check.setVisible(boss.toLowerCase(Locale.ROOT).contains(query)));
+		bossChoices.revalidate();
+		bossChoices.repaint();
+	}
+
+	private void updateGoalFields()
+	{
+		GoalChoice choice = (GoalChoice) goalChoice.getSelectedItem();
+		String id = choice == null ? "FIRST_KILLS" : choice.id;
+		killRow.setVisible("FIRST_KILLS".equals(id) || "KILLS_EACH".equals(id));
+		valueRow.setVisible("FIRST_VALUE".equals(id));
+		rareRow.setVisible("FIRST_RARE".equals(id) || "EVERYONE_RARE".equals(id));
+	}
+
+	private RunSetup selectedSetup()
+	{
+		RunSetup setup = new RunSetup();
+		setup.bosses = new ArrayList<>();
+		bossChecks.forEach((boss, check) -> { if (check.isSelected()) { setup.bosses.add(boss); } });
+		setup.goalType = ((GoalChoice) goalChoice.getSelectedItem()).id;
+		setup.killTarget = ((Number) killTarget.getValue()).intValue();
+		setup.valueTarget = ((Number) valueTarget.getValue()).longValue();
+		setup.rareItems = rareItems.getText().trim();
+		return setup;
+	}
+
+	private void applySetup(RunSetup setup)
+	{
+		bossChecks.forEach((boss, check) -> check.setSelected(setup.bosses.contains(boss)));
+		for (int i = 0; i < goalChoice.getItemCount(); i++)
+		{
+			if (goalChoice.getItemAt(i).id.equals(setup.goalType))
+			{
+				goalChoice.setSelectedIndex(i);
+				break;
+			}
+		}
+		killTarget.setValue(Math.max(1, setup.killTarget));
+		valueTarget.setValue(Math.max(1L, setup.valueTarget));
+		rareItems.setText(setup.rareItems);
+		updateGoalFields();
+	}
+
+	private void openSetup()
+	{
+		setupVisible = true;
+		setupStatus.setText(" ");
+		cards.show(this, "setup");
+	}
+
+	private void closeSetup()
+	{
+		setupVisible = false;
+		cards.show(this, "run");
 	}
 
 	void showState(MatchState state, String playerSummary, String matchHistory, boolean inParty, boolean isHost)
 	{
-		showParty(inParty);
+		this.inParty = inParty;
+		partyLabel.setText(inParty ? "RuneLite party connected" : "Join a party in RuneLite's Party panel");
 		if (state == null)
 		{
-			matchLabel.setText("No match running");
+			matchLabel.setText("No run running");
 			bossLabel.setText("Current boss: —");
 			goalLabel.setText("Goal: —");
-			players.setText("Start a match to lock the selected boss pool.");
+			players.setText("Set up a run to choose your bosses and goal.");
 			history.setText("");
-			startButton.setEnabled(inParty);
+			setupButton.setEnabled(true);
 			spinButton.setEnabled(false);
 			endButton.setEnabled(false);
 			return;
 		}
 
-		matchLabel.setText(state.ended ? "Match ended" : "Match active · leg " + state.legNumber);
+		matchLabel.setText(state.ended ? "Run ended" : "Run active · leg " + state.legNumber);
 		bossLabel.setText("Current boss: " + (state.currentBoss == null ? "—" : state.currentBoss));
 		goalLabel.setText(goalDescription(state));
 		players.setText(playerSummary);
 		history.setText(matchHistory);
-		startButton.setEnabled(inParty && state.ended);
+		setupButton.setEnabled(state.ended);
 		spinButton.setEnabled(inParty && isHost && !state.ended && (state.currentBoss == null || state.legComplete));
 		endButton.setEnabled(inParty && isHost && !state.ended);
+		if (!state.ended && setupVisible)
+		{
+			closeSetup();
+		}
 	}
 
 	private static String goalDescription(MatchState state)
 	{
-		if ("EVERYONE_RARE".equals(state.goalType))
+		switch (state.goalType)
 		{
-			return "Goal: one configured rare for everyone";
+			case "EVERYONE_RARE": return "Goal: everyone gets a chosen rare drop";
+			case "FIRST_RARE": return "Goal: first player gets a chosen rare drop";
+			case "FIRST_PET": return "Goal: first player gets a pet";
+			case "EVERYONE_PET": return "Goal: everyone gets a pet";
+			case "FIRST_KILLS": return "Goal: first player reaches " + state.killsPerMember + " kills";
+			case "KILLS_EACH": return "Goal: everyone reaches " + state.killsPerMember + " kills";
+			case "FIRST_VALUE": return "<html>Goal: first to " + String.format(Locale.ROOT, "%,d", state.valueTarget)
+				+ " GP<br>in drops</html>";
+			default: return "Goal: —";
 		}
-		if ("FIRST_PET".equals(state.goalType))
+	}
+
+	private static final class GoalChoice
+	{
+		private final String id;
+		private final String label;
+
+		private GoalChoice(String id, String label)
 		{
-			return "Goal: first party member to get a pet";
+			this.id = id;
+			this.label = label;
 		}
-		if ("EVERYONE_PET".equals(state.goalType))
+
+		@Override
+		public String toString()
 		{
-			return "Goal: every party member gets a pet";
+			return label;
 		}
-		if ("FIRST_KILLS".equals(state.goalType))
-		{
-			return "Goal: first member to " + state.killsPerMember + " kills";
-		}
-		if ("KILLS_EACH".equals(state.goalType))
-		{
-			return "Goal: " + state.killsPerMember + " kills per member";
-		}
-		if ("FIRST_VALUE".equals(state.goalType))
-		{
-			return "Goal: first member to " + state.valueTarget + " GP in drops";
-		}
-		return "Goal: first configured rare";
 	}
 }

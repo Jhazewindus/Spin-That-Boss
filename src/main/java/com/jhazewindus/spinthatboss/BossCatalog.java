@@ -1,6 +1,7 @@
 package com.jhazewindus.spinthatboss;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -54,6 +55,11 @@ final class BossCatalog
 	static String defaultPool()
 	{
 		return String.join(", ", BOSSES);
+	}
+
+	static List<String> bosses()
+	{
+		return Collections.unmodifiableList(BOSSES);
 	}
 
 	static boolean matchesLoot(String wheelBoss, String lootName)

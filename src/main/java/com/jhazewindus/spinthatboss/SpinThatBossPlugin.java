@@ -44,8 +44,7 @@ import org.slf4j.LoggerFactory;
 	name = "Spin That Boss",
 	configName = "spin-that-boss",
 	description = "Run a shared, randomized boss challenge with a RuneLite party",
-	tags = {"boss", "party", "challenge", "loot"},
-	enabledByDefault = false
+	tags = {"boss", "party", "challenge", "loot"}
 )
 public class SpinThatBossPlugin extends Plugin
 {

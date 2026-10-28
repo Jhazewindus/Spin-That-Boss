@@ -1,57 +1,61 @@
 # Spin That Boss
 
-A RuneLite Plugin Hub plugin for long-running boss challenges with friends.
+**Pick your bosses. Spin the wheel. Take on the challenge together.**
 
-## First prototype
+Spin That Boss turns bossing with friends into a shared challenge. Let the wheel choose your next boss, work towards a goal, and follow everyone's progress in one sidebar.
 
-- Uses RuneLite's built-in Party plugin and passphrase parties for live sharing.
-- The host chooses the boss pool before starting. The wheel draws without repeats until the pool is used, then reshuffles without immediately repeating the previous boss.
-- Boss leg goals include first configured rare, one configured rare per member, a pet for the first/every member, first to a kill target, a kill target per member, or first to a drop-value target.
-- Server-provided NPC loot events update each member's own counters and configured rare drops. Boss spawn and loot events estimate personal fastest times. Pet goals use the game's pet notification chat messages. The plugin shares those updates only with members of the current RuneLite party.
-- An opt-in setting fetches each member's starting boss KC from Wise Old Man when a new leg begins. It is off by default and shows RuneLite's third-party-service warning.
-- The host can spin after the leg goal is met and can end the match. Match state is saved locally so members can resume after restarting the client.
+*Currently awaiting [Plugin Hub review](https://github.com/runelite/plugin-hub/pull/19606).*
 
-## Development
+## What it does
 
-Use Java 11 or newer. In RuneLite, enable the built-in **Party** plugin and create or join a party first. Then start this plugin and open its sidebar panel. The host starts the match and spins the wheel; other members see the host's match state and their party's progress.
+- **Your own boss wheel** — choose the bosses your group wants to fight. Each boss comes up once before the wheel reshuffles.
+- **Shared challenges** — race for a rare drop, chase a pet, or set a kill-count or loot-value target.
+- **Party progress** — see everyone's kills, tracked rare drops, and loot value alongside the current boss and goal.
+- **Match history** — look back at completed rounds and keep your progress between sessions.
 
-Run the development client with:
+## Getting started
 
-```sh
-./gradlew run
-```
+1. Enable RuneLite's **Party** plugin. Create a party and share its passphrase with your friends.
+2. Have everyone join the same party and enable **Spin That Boss**.
+3. In the plugin settings, set **Bosses in wheel** and **Leg goal**. A leg is one round of the challenge.
+4. Open the Spin That Boss sidebar. One player clicks **Start match** to become the host, then **Spin the wheel**.
+5. Go bossing! Once the goal is met, the host can spin for the next round or use **End match** to finish.
 
-For a Jagex account, follow RuneLite's [Using Jagex Accounts](https://github.com/runelite/runelite/wiki/Using-Jagex-Accounts) instructions. The development client needs a graphical desktop.
+The boss list is locked when the match starts. Only the host can spin or end the match. Keep everyone on the same plugin version, and rejoin the same party to pick up a saved match.
 
-Build the plugin, run the automated model tests, and package the development launcher with:
+## Choose your challenge
 
-```sh
-./gradlew build shadowJar
-```
+Enter one of these values in **Leg goal**:
 
-The cloud workspace has a prepared JDK and Gradle cache. In that workspace, first run `source /workspace/.setup/spin-that-boss/env.sh`. Other machines can use their usual JDK installation. Compilation targets Java 11.
+| Challenge | Setting |
+| --- | --- |
+| First player to get a chosen rare drop | `FIRST_RARE` |
+| Everyone gets a chosen rare drop | `EVERYONE_RARE` |
+| First player to get a pet | `FIRST_PET` |
+| Everyone gets a pet | `EVERYONE_PET` |
+| First player to reach the kill target | `FIRST_KILLS` |
+| Everyone reaches the kill target | `KILLS_EACH` |
+| First player to reach the loot-value target | `FIRST_VALUE` |
 
-All party members should run the same plugin version. Progress messages include the leg number so delayed messages from an earlier visit to the same boss are ignored. Local loot counters survive a host snapshot for the same leg. Changing parties pauses the saved match; rejoining its party allows synchronization to resume. RuneLite's temporary `<unknown>` member name is excluded from the roster until the character name arrives.
+Use **Kills per member** to set the kill target, or **Drop value target** for the GP target. Loot value uses Grand Exchange prices.
 
-Choose a leg goal in the plugin settings. Rare targets are configured with one line per boss, for example:
+For rare-drop challenges, everyone should use the same **Rare items by boss** list. Add a line for each boss in your wheel, separating drops with `|`:
 
 ```text
-Zulrah: Tanzanite fang | Magic fang | Serpentine visage | Jar of swamp
+Zulrah: Tanzanite fang | Magic fang | Serpentine visage
+Vorkath: Skeletal visage | Draconic visage
 ```
 
-## Plugin Hub
+## Optional Wise Old Man lookup
 
-The project follows the [RuneLite Plugin Hub workflow](https://github.com/runelite/plugin-hub). After this source is committed and pushed to the public repository, fork `runelite/plugin-hub`, add a manifest under `plugins/spin-that-boss` with the source URL and exact reviewed commit, and open a PR against Plugin Hub. Plugin Hub maintainers review and merge that PR; plugin authors cannot publish directly to the catalog. See the hub's current contribution instructions for the manifest format and required checks.
+Turn on **Use Wise Old Man baselines** to show your recorded boss KC at the start of a round. It's off by default. Enabling it sends your character name to Wise Old Man, which also receives your IP address.
 
-This is an early prototype. Boss naming, game-message text, loot attribution, Wise Old Man boss metric names, and party synchronization still need in-client validation. The submission has automated build and model-test coverage; it has not been tested in-game.
+## Things to know
 
-## Manual validation
+This is an early release and still needs in-game testing. Pet tracking can count a pet earned from another activity, and displayed kill times are estimates. Wise Old Man lookups also still need live testing.
 
-1. Use two clients in the same RuneLite party, enable Spin That Boss, and start a match. Both panels should show the same boss pool and host. Only the host should be able to spin or end it.
-2. Set `FIRST_KILLS` to a small target. Confirm that only the assigned boss's personal loot increments your counter and that both clients see the progress. Complete a leg, spin again, and confirm that leg counters reset while match totals remain.
-3. Exercise every boss in the pool. A refill should contain every boss once and should not immediately repeat the last boss when the pool has more than one entry.
-4. Join late, restart a client, disable/re-enable the plugin, and leave/rejoin the party. Confirm names, saved progress, and host controls recover. In another party, the old match must not collect or send progress.
-5. Check configured rare drops and pet goals manually. Pet recognition currently uses generic game chat text, so attribution to the assigned boss is a prototype limitation; an unrelated pet can be misattributed. Fastest times are spawn-to-loot estimates rather than official kill-time records.
-6. Leave Wise Old Man disabled for the core checks. If you opt in, verify the baseline for a tracked player and the current boss, then switch legs or disable the plugin while a request is pending. Live Wise Old Man access is a separate check; the cloud allowlist currently includes RuneLite's Maven host but not `api.wiseoldman.net`.
+## Help
 
-The automated suite covers shuffle-bag invariants, all seven leg goals, malformed state, party/host/leg validation, and retention of local progress. It does not establish that the plugin works in-game. The Plugin Hub manifest must point to the exact reviewed source commit.
+Found a problem or have an idea? [Open an issue](https://github.com/Jhazewindus/Spin-That-Boss/issues). Include the boss, your chosen goal, and what happened.
+
+[Developer guide](docs/DEVELOPMENT.md) · [License](https://github.com/Jhazewindus/Spin-That-Boss/blob/plugin-hub-submission/LICENSE)

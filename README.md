@@ -10,7 +10,7 @@ Spin That Boss turns bossing with friends into a shared challenge. Let the wheel
 
 - **Your own boss wheel** — choose the bosses your group wants to fight. Each boss comes up once before the wheel reshuffles.
 - **Bosses ready to pick** — search and tick bosses in the sidebar, or use **Select all**. Raids, Barrows, and Moons each have one entry; other boss variants stay separate.
-- **Shared challenges** — race for a rare drop, chase a pet, or set a kill-count or loot-value target.
+- **Shared challenges** — race for a boss unique or pet, or set a kill-count or loot-value target.
 - **Party progress** — see everyone's kills, tracked rare drops, and loot value alongside the current boss and goal.
 - **Match history** — look back at completed rounds and keep your progress between sessions.
 
@@ -18,8 +18,8 @@ Spin That Boss turns bossing with friends into a shared challenge. Let the wheel
 
 1. Enable RuneLite's **Party** plugin. Create a party and share its passphrase with your friends.
 2. Have everyone join the same party and enable **Spin That Boss** and RuneLite's built-in **Loot Tracker**.
-3. Open the Spin That Boss sidebar. One player clicks **Setup run**, chooses the bosses and a goal, then clicks **Start run** to become the host. A leg is one round of the challenge.
-4. The host clicks **Spin the wheel** to pick the first boss.
+3. Open the Spin That Boss sidebar. The host clicks **Setup run**, chooses bosses and a goal, then clicks **Create party and invite friends**. Share the displayed RuneLite Party passphrase so friends can join.
+4. Once at least one friend has joined, click **Start run**, then **Spin the wheel** to pick the first boss.
 5. Go bossing! Once the goal is met, the host can spin for the next round or use **End run** to finish.
 
 The boss list is locked when the match starts. Only the host can spin or end the match. Keep everyone on the same plugin version, and rejoin the same party to pick up a saved match.
@@ -42,7 +42,9 @@ Choose a goal from the dropdown in **Setup run**:
 
 The setup menu shows **Kills needed** or **Loot value needed (GP)** when that goal uses a target. Loot value adds up the tracked drops for the current boss using Grand Exchange prices; the sidebar shows each member's progress against the target.
 
-The starting goal is **first to kill target**. For rare-drop challenges, the host enters **Rare drops** in setup and shares that list with the party. Add a line for each boss in your wheel, separating drops with `|`:
+For a unique-drop goal, choose **Any unique drop** or a particular collection-log drop from the dropdown. The choices are based on OSRS Wiki drop tables and refreshed boss collection-log data. The data source is [Bossman Mode's public boss ladder](https://github.com/erikrahm/osrs-runelite-bossman-mode/blob/main/src/main/resources/bossman/ladder.json); item names and game data are from the [OSRS Wiki](https://oldschool.runescape.wiki/).
+
+The starting goal is **first to kill target**. Use **Test spin** to preview the result in a popup without starting a run. A live spin displays the selected boss in the sidebar.
 
 ```text
 Zulrah: Tanzanite fang | Magic fang | Serpentine visage

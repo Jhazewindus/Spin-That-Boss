@@ -11,4 +11,5 @@ final class RunSetup
 	int killTarget = 25;
 	long valueTarget = 100_000_000L;
 	String rareItems = "Zulrah: Tanzanite fang | Magic fang | Serpentine visage | Jar of swamp";
+	String uniqueDrop = "Any unique drop";
 }

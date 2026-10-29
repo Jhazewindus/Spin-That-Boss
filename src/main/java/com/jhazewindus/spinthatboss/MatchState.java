@@ -17,6 +17,7 @@ public class MatchState
 	public int killsPerMember;
 	public long valueTarget;
 	public String rareItems;
+	public String uniqueDrop;
 	public boolean legComplete;
 	public List<String> bossPool = new ArrayList<>();
 	public List<String> remainingBosses = new ArrayList<>();

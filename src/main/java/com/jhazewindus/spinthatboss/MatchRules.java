@@ -98,8 +98,10 @@ final class MatchRules
 		{
 			case "FIRST_RARE":
 			case "EVERYONE_RARE":
+			case "FIRST_UNIQUE":
+			case "EVERYONE_UNIQUE":
 				goal = p -> !p.currentLegRareDrops.isEmpty();
-				everyone = "EVERYONE_RARE".equals(state.goalType);
+				everyone = "EVERYONE_RARE".equals(state.goalType) || "EVERYONE_UNIQUE".equals(state.goalType);
 				break;
 			case "FIRST_PET":
 			case "EVERYONE_PET":

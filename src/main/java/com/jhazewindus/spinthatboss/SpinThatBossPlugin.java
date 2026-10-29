@@ -18,6 +18,7 @@ import javax.swing.SwingUtilities;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.PartyChanged;
 import net.runelite.api.events.NpcSpawned;
@@ -54,6 +55,8 @@ public class SpinThatBossPlugin extends Plugin
 	private static final String CONFIG_GROUP = "spin-that-boss";
 	private static final String RARE_GOAL_FIRST = "FIRST_RARE";
 	private static final String RARE_GOAL_EVERYONE = "EVERYONE_RARE";
+	private static final String UNIQUE_GOAL_FIRST = "FIRST_UNIQUE";
+	private static final String UNIQUE_GOAL_EVERYONE = "EVERYONE_UNIQUE";
 	private static final String KILL_GOAL_EACH = "KILLS_EACH";
 	private static final String KILL_GOAL_FIRST = "FIRST_KILLS";
 	private static final String PET_GOAL_FIRST = "FIRST_PET";
@@ -66,6 +69,8 @@ public class SpinThatBossPlugin extends Plugin
 	private ConfigManager configManager;
 	@Inject
 	private PartyService partyService;
+	@Inject
+	private ClientThread clientThread;
 	@Inject
 	private WSClient wsClient;
 	@Inject
@@ -89,7 +94,7 @@ public class SpinThatBossPlugin extends Plugin
 		log.info("Spin That Boss started");
 		wsClient.registerMessage(MatchMessage.class);
 		loadSavedMatch();
-		panel = new SpinThatBossPanel(this::startMatch, this::spin, this::endMatch, initialSetup());
+		panel = new SpinThatBossPanel(this::createParty, this::startMatch, this::spin, this::endMatch, initialSetup());
 		navigationButton = NavigationButton.builder()
 			.tooltip("Spin That Boss")
 			.icon(makeIcon())
@@ -102,6 +107,20 @@ public class SpinThatBossPlugin extends Plugin
 		{
 			requestMatchSync();
 		}
+	}
+
+	private void createParty(RunSetup setup)
+	{
+		clientThread.invokeLater(() -> {
+			if (partyService.isInParty())
+			{
+				SwingUtilities.invokeLater(() -> panel.showInviteCode(partyService.getPartyPassphrase()));
+				return;
+			}
+			String passphrase = partyService.generatePassphrase();
+			partyService.changeParty(passphrase);
+			SwingUtilities.invokeLater(() -> { if (panel != null) panel.showInviteCode(passphrase); });
+		});
 	}
 
 	@Override
@@ -336,8 +355,12 @@ public class SpinThatBossPlugin extends Plugin
 
 	private synchronized void startMatch(RunSetup setup)
 	{
-		if (!partyService.isInParty() || (isMatchInParty() && !match.ended))
+		if (!partyService.isInParty() || partyService.getMembers().size() < 2 || (isMatchInParty() && !match.ended))
 		{
+			if (panel != null && partyService.isInParty() && partyService.getMembers().size() < 2)
+			{
+				SwingUtilities.invokeLater(() -> panel.showInviteCode(partyService.getPartyPassphrase()));
+			}
 			return;
 		}
 		PartyMember host = partyService.getLocalMember();
@@ -364,7 +387,7 @@ public class SpinThatBossPlugin extends Plugin
 		match.goalType = normalizeGoal(setup.goalType);
 		match.killsPerMember = Math.max(1, setup.killTarget);
 		match.valueTarget = Math.max(1L, setup.valueTarget);
-		match.rareItems = setup.rareItems;
+		match.uniqueDrop = setup.uniqueDrop;
 		for (PartyMember member : partyService.getMembers())
 		{
 			addMember(member);
@@ -680,7 +703,7 @@ public class SpinThatBossPlugin extends Plugin
 			setup.goalType = match.goalType;
 			setup.killTarget = match.killsPerMember;
 			setup.valueTarget = match.valueTarget;
-			setup.rareItems = match.rareItems == null ? legacySetting("rareItems", setup.rareItems) : match.rareItems;
+			setup.uniqueDrop = match.uniqueDrop == null ? "Any unique drop" : match.uniqueDrop;
 			return setup;
 		}
 		setup.bosses = BossWheel.parsePool(legacySetting("bossPool", BossCatalog.defaultPool()));
@@ -694,7 +717,6 @@ public class SpinThatBossPlugin extends Plugin
 		{
 			log.debug("Ignoring invalid old run target", ex);
 		}
-		setup.rareItems = legacySetting("rareItems", setup.rareItems);
 		return setup;
 	}
 
@@ -804,27 +826,12 @@ public class SpinThatBossPlugin extends Plugin
 
 	private boolean isConfiguredRare(String boss, String itemName)
 	{
-		if (itemName == null)
+		if (itemName == null || match == null)
 		{
 			return false;
 		}
-		String configured = match.rareItems == null ? legacySetting("rareItems", new RunSetup().rareItems) : match.rareItems;
-		for (String line : configured.split("\\R"))
-		{
-			int separator = line.indexOf(':');
-			if (separator < 1 || !sameBoss(boss, line.substring(0, separator).trim()))
-			{
-				continue;
-			}
-			for (String rareName : line.substring(separator + 1).split("\\|"))
-			{
-				if (itemName.equalsIgnoreCase(rareName.trim()))
-				{
-					return true;
-				}
-			}
-		}
-		return false;
+		boolean included = BossUniqueCatalog.drops(boss).stream().anyMatch(itemName::equalsIgnoreCase);
+		return included && ("Any unique drop".equals(match.uniqueDrop) || itemName.equalsIgnoreCase(match.uniqueDrop));
 	}
 
 	private static boolean sameBoss(String a, String b)
@@ -836,6 +843,8 @@ public class SpinThatBossPlugin extends Plugin
 	{
 		String normalized = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
 		if (RARE_GOAL_EVERYONE.equals(normalized)
+			|| UNIQUE_GOAL_FIRST.equals(normalized)
+			|| UNIQUE_GOAL_EVERYONE.equals(normalized)
 			|| KILL_GOAL_EACH.equals(normalized)
 			|| KILL_GOAL_FIRST.equals(normalized)
 			|| PET_GOAL_FIRST.equals(normalized)

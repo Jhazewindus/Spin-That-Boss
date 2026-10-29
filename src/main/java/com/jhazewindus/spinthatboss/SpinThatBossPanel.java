@@ -23,6 +23,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JSpinner;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.JOptionPane;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingConstants;
 import javax.swing.event.DocumentEvent;
@@ -35,8 +36,8 @@ final class SpinThatBossPanel extends PluginPanel
 		new GoalChoice("FIRST_KILLS", "First to kill target"),
 		new GoalChoice("KILLS_EACH", "Everyone reaches kill target"),
 		new GoalChoice("FIRST_VALUE", "First to loot-value target"),
-		new GoalChoice("FIRST_RARE", "First to chosen rare drop"),
-		new GoalChoice("EVERYONE_RARE", "Everyone gets chosen rare"),
+		new GoalChoice("FIRST_UNIQUE", "First to chosen boss unique"),
+		new GoalChoice("EVERYONE_UNIQUE", "Everyone gets chosen boss unique"),
 		new GoalChoice("FIRST_PET", "First to pet"),
 		new GoalChoice("EVERYONE_PET", "Everyone gets pet")
 	};
@@ -52,6 +53,9 @@ final class SpinThatBossPanel extends PluginPanel
 	private final JButton spinButton = new JButton("Spin the wheel");
 	private final JButton endButton = new JButton("End run");
 	private final JButton startButton = new JButton("Start run");
+	private final JButton createPartyButton = new JButton("Create party and invite friends");
+	private final JTextField inviteCode = new JTextField();
+	private final JComboBox<String> uniqueChoice = new JComboBox<>();
 	private final JLabel setupStatus = new JLabel(" ");
 	private final JTextField search = new JTextField();
 	private final JPanel bossChoices = new JPanel();
@@ -62,19 +66,23 @@ final class SpinThatBossPanel extends PluginPanel
 	private final JPanel killRow = new JPanel(new BorderLayout(4, 2));
 	private final JPanel valueRow = new JPanel(new BorderLayout(4, 2));
 	private final JPanel rareRow = new JPanel(new BorderLayout(4, 2));
-	private final JTextArea rareItems = new JTextArea(4, 20);
 	private boolean inParty;
 	private boolean setupVisible;
 
-	SpinThatBossPanel(Consumer<RunSetup> start, Runnable spin, Runnable end, RunSetup initial)
+	SpinThatBossPanel(Consumer<RunSetup> createParty, Consumer<RunSetup> start, Runnable spin, Runnable end, RunSetup initial)
 	{
 		super(false);
 		setLayout(cards);
 		setPreferredSize(new Dimension(250, 480));
 		add(createRunView(spin, end), "run");
-		add(createSetupView(start), "setup");
+		add(createSetupView(createParty, start), "setup");
 		applySetup(initial);
 		cards.show(this, "run");
+	}
+
+	SpinThatBossPanel(Consumer<RunSetup> start, Runnable spin, Runnable end, RunSetup initial)
+	{
+		this(setup -> { }, start, spin, end, initial);
 	}
 
 	private JPanel createRunView(Runnable spin, Runnable end)
@@ -119,7 +127,7 @@ final class SpinThatBossPanel extends PluginPanel
 		return view;
 	}
 
-	private JPanel createSetupView(Consumer<RunSetup> start)
+	private JPanel createSetupView(Consumer<RunSetup> createParty, Consumer<RunSetup> start)
 	{
 		JPanel view = new JPanel(new BorderLayout(6, 6));
 		view.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
@@ -143,6 +151,7 @@ final class SpinThatBossPanel extends PluginPanel
 		for (String boss : BossCatalog.bosses())
 		{
 			JCheckBox check = new JCheckBox(boss);
+			check.addActionListener(e -> updateUniqueChoices());
 			bossChecks.put(boss, check);
 			bossChoices.add(check);
 		}
@@ -163,10 +172,8 @@ final class SpinThatBossPanel extends PluginPanel
 		killRow.add(killTarget, BorderLayout.CENTER);
 		valueRow.add(new JLabel("Loot value needed (GP)"), BorderLayout.NORTH);
 		valueRow.add(valueTarget, BorderLayout.CENTER);
-		rareRow.add(new JLabel("Rare drops (Boss: Item | Item)"), BorderLayout.NORTH);
-		rareItems.setLineWrap(true);
-		rareItems.setWrapStyleWord(true);
-		rareRow.add(new JScrollPane(rareItems), BorderLayout.CENTER);
+		rareRow.add(new JLabel("Boss unique drop"), BorderLayout.NORTH);
+		rareRow.add(uniqueChoice, BorderLayout.CENTER);
 		options.add(killRow);
 		options.add(valueRow);
 		options.add(rareRow);
@@ -204,16 +211,32 @@ final class SpinThatBossPanel extends PluginPanel
 			}
 			if (!inParty)
 			{
-				setupStatus.setText("Join a RuneLite party first.");
+				setupStatus.setText("Create a party and share its invite code first.");
 				return;
 			}
 			setupStatus.setText(" ");
 			start.accept(setup);
 		});
+		createPartyButton.addActionListener(e -> createParty.accept(selectedSetup()));
+		JButton testSpin = new JButton("Test spin");
+		testSpin.addActionListener(e -> {
+			List<String> pool = selectedSetup().bosses;
+			if (pool.isEmpty()) { setupStatus.setText("Select a boss to preview."); return; }
+			String boss = pool.get(new java.util.Random().nextInt(pool.size()));
+			JOptionPane.showMessageDialog(this, "The wheel lands on\\n\\n" + boss + "\\n\\nPreview only — no run has started.", "Spin That Boss · Test spin", JOptionPane.INFORMATION_MESSAGE);
+		});
+		inviteCode.setEditable(false);
+		inviteCode.setToolTipText("Share this RuneLite Party passphrase with your friends");
+		JButton copyInvite = new JButton("Copy invite");
+		copyInvite.addActionListener(e -> { if (!inviteCode.getText().isEmpty()) java.awt.Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new java.awt.datatransfer.StringSelection(inviteCode.getText()), null); });
 		JButton back = new JButton("Back");
 		back.addActionListener(e -> closeSetup());
 		JPanel bottom = new JPanel(new GridLayout(0, 1, 0, 3));
 		bottom.add(setupStatus);
+		bottom.add(createPartyButton);
+		bottom.add(inviteCode);
+		bottom.add(copyInvite);
+		bottom.add(testSpin);
 		bottom.add(startButton);
 		bottom.add(back);
 		view.add(bottom, BorderLayout.SOUTH);
@@ -234,7 +257,7 @@ final class SpinThatBossPanel extends PluginPanel
 		String id = choice == null ? "FIRST_KILLS" : choice.id;
 		killRow.setVisible("FIRST_KILLS".equals(id) || "KILLS_EACH".equals(id));
 		valueRow.setVisible("FIRST_VALUE".equals(id));
-		rareRow.setVisible("FIRST_RARE".equals(id) || "EVERYONE_RARE".equals(id));
+		rareRow.setVisible("FIRST_UNIQUE".equals(id) || "EVERYONE_UNIQUE".equals(id));
 	}
 
 	private RunSetup selectedSetup()
@@ -245,7 +268,7 @@ final class SpinThatBossPanel extends PluginPanel
 		setup.goalType = ((GoalChoice) goalChoice.getSelectedItem()).id;
 		setup.killTarget = ((Number) killTarget.getValue()).intValue();
 		setup.valueTarget = ((Number) valueTarget.getValue()).longValue();
-		setup.rareItems = rareItems.getText().trim();
+		setup.uniqueDrop = (String) uniqueChoice.getSelectedItem();
 		return setup;
 	}
 
@@ -262,8 +285,31 @@ final class SpinThatBossPanel extends PluginPanel
 		}
 		killTarget.setValue(Math.max(1, setup.killTarget));
 		valueTarget.setValue(Math.max(1L, setup.valueTarget));
-		rareItems.setText(setup.rareItems);
+		updateUniqueChoices();
+		uniqueChoice.setSelectedItem(setup.uniqueDrop);
 		updateGoalFields();
+	}
+
+	private void updateUniqueChoices()
+	{
+		String selected = (String) uniqueChoice.getSelectedItem();
+		uniqueChoice.removeAllItems();
+		uniqueChoice.addItem("Any unique drop");
+		for (String item : BossUniqueCatalog.allDrops(selectedBosses())) uniqueChoice.addItem(item);
+		if (selected != null) uniqueChoice.setSelectedItem(selected);
+	}
+
+	private List<String> selectedBosses()
+	{
+		List<String> selected = new ArrayList<>();
+		bossChecks.forEach((boss, check) -> { if (check.isSelected()) selected.add(boss); });
+		return selected;
+	}
+
+	void showInviteCode(String code)
+	{
+		inviteCode.setText(code == null ? "" : code);
+		setupStatus.setText(code == null ? "Party not ready" : "Share this code in RuneLite Party so friends can join.");
 	}
 
 	private void openSetup()
@@ -291,6 +337,7 @@ final class SpinThatBossPanel extends PluginPanel
 			players.setText("Set up a run to choose your bosses and goal.");
 			history.setText("");
 			setupButton.setEnabled(true);
+			if (inParty && inviteCode.getText().isEmpty()) inviteCode.setText("Party connected — share its passphrase");
 			spinButton.setEnabled(false);
 			endButton.setEnabled(false);
 			return;
@@ -314,6 +361,8 @@ final class SpinThatBossPanel extends PluginPanel
 	{
 		switch (state.goalType)
 		{
+			case "FIRST_UNIQUE": return "Goal: first player gets a boss unique";
+			case "EVERYONE_UNIQUE": return "Goal: everyone gets a boss unique";
 			case "EVERYONE_RARE": return "Goal: everyone gets a chosen rare drop";
 			case "FIRST_RARE": return "Goal: first player gets a chosen rare drop";
 			case "FIRST_PET": return "Goal: first player gets a pet";

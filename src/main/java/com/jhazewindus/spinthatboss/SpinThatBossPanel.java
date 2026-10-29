@@ -23,7 +23,6 @@ import javax.swing.JScrollPane;
 import javax.swing.JSpinner;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
-import javax.swing.JOptionPane;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingConstants;
 import javax.swing.event.DocumentEvent;
@@ -68,21 +67,23 @@ final class SpinThatBossPanel extends PluginPanel
 	private final JPanel rareRow = new JPanel(new BorderLayout(4, 2));
 	private boolean inParty;
 	private boolean setupVisible;
+	private String lastShownBoss;
+	private int lastShownLeg;
 
-	SpinThatBossPanel(Consumer<RunSetup> createParty, Consumer<RunSetup> start, Runnable spin, Runnable end, RunSetup initial)
+	SpinThatBossPanel(Consumer<RunSetup> createParty, Consumer<String> joinParty, Consumer<RunSetup> start, Runnable spin, Runnable end, RunSetup initial)
 	{
 		super(false);
 		setLayout(cards);
 		setPreferredSize(new Dimension(250, 480));
 		add(createRunView(spin, end), "run");
-		add(createSetupView(createParty, start), "setup");
+		add(createSetupView(createParty, joinParty, start), "setup");
 		applySetup(initial);
 		cards.show(this, "run");
 	}
 
 	SpinThatBossPanel(Consumer<RunSetup> start, Runnable spin, Runnable end, RunSetup initial)
 	{
-		this(setup -> { }, start, spin, end, initial);
+		this(setup -> { }, code -> { }, start, spin, end, initial);
 	}
 
 	private JPanel createRunView(Runnable spin, Runnable end)
@@ -127,7 +128,7 @@ final class SpinThatBossPanel extends PluginPanel
 		return view;
 	}
 
-	private JPanel createSetupView(Consumer<RunSetup> createParty, Consumer<RunSetup> start)
+	private JPanel createSetupView(Consumer<RunSetup> createParty, Consumer<String> joinPartyCallback, Consumer<RunSetup> start)
 	{
 		JPanel view = new JPanel(new BorderLayout(6, 6));
 		view.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
@@ -223,12 +224,14 @@ final class SpinThatBossPanel extends PluginPanel
 			List<String> pool = selectedSetup().bosses;
 			if (pool.isEmpty()) { setupStatus.setText("Select a boss to preview."); return; }
 			String boss = pool.get(new java.util.Random().nextInt(pool.size()));
-			JOptionPane.showMessageDialog(this, "The wheel lands on\\n\\n" + boss + "\\n\\nPreview only — no run has started.", "Spin That Boss · Test spin", JOptionPane.INFORMATION_MESSAGE);
+			WheelSpinDialog.show(this, pool, boss, "Spin That Boss · Test spin");
 		});
-		inviteCode.setEditable(false);
-		inviteCode.setToolTipText("Share this RuneLite Party passphrase with your friends");
+		inviteCode.setEditable(true);
+		inviteCode.setToolTipText("Paste a friend's RuneLite Party passphrase to join");
 		JButton copyInvite = new JButton("Copy invite");
 		copyInvite.addActionListener(e -> { if (!inviteCode.getText().isEmpty()) java.awt.Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new java.awt.datatransfer.StringSelection(inviteCode.getText()), null); });
+		JButton joinParty = new JButton("Join party with code");
+		joinParty.addActionListener(e -> joinPartyCallback.accept(inviteCode.getText()));
 		JButton back = new JButton("Back");
 		back.addActionListener(e -> closeSetup());
 		JPanel bottom = new JPanel(new GridLayout(0, 1, 0, 3));
@@ -236,6 +239,7 @@ final class SpinThatBossPanel extends PluginPanel
 		bottom.add(createPartyButton);
 		bottom.add(inviteCode);
 		bottom.add(copyInvite);
+		bottom.add(joinParty);
 		bottom.add(testSpin);
 		bottom.add(startButton);
 		bottom.add(back);
@@ -346,6 +350,13 @@ final class SpinThatBossPanel extends PluginPanel
 		matchLabel.setText(state.ended ? "Run ended" : "Run active · leg " + state.legNumber);
 		bossLabel.setText("Current boss: " + (state.currentBoss == null ? "—" : state.currentBoss));
 		goalLabel.setText(goalDescription(state));
+		if (!state.ended && state.currentBoss != null && state.legNumber > 0
+			&& (!state.currentBoss.equals(lastShownBoss) || state.legNumber != lastShownLeg))
+		{
+			lastShownBoss = state.currentBoss;
+			lastShownLeg = state.legNumber;
+			WheelSpinDialog.show(this, state.bossPool, state.currentBoss, "Spin That Boss");
+		}
 		players.setText(playerSummary);
 		history.setText(matchHistory);
 		setupButton.setEnabled(state.ended);

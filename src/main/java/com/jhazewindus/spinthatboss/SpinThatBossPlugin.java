@@ -94,7 +94,7 @@ public class SpinThatBossPlugin extends Plugin
 		log.info("Spin That Boss started");
 		wsClient.registerMessage(MatchMessage.class);
 		loadSavedMatch();
-		panel = new SpinThatBossPanel(this::createParty, this::startMatch, this::spin, this::endMatch, initialSetup());
+		panel = new SpinThatBossPanel(this::createParty, this::joinParty, this::startMatch, this::spin, this::endMatch, initialSetup());
 		navigationButton = NavigationButton.builder()
 			.tooltip("Spin That Boss")
 			.icon(makeIcon())
@@ -121,6 +121,13 @@ public class SpinThatBossPlugin extends Plugin
 			partyService.changeParty(passphrase);
 			SwingUtilities.invokeLater(() -> { if (panel != null) panel.showInviteCode(passphrase); });
 		});
+	}
+
+	private void joinParty(String passphrase)
+	{
+		String code = passphrase == null ? "" : passphrase.trim();
+		if (code.isEmpty()) return;
+		clientThread.invokeLater(() -> partyService.changeParty(code));
 	}
 
 	@Override

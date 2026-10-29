@@ -16,13 +16,13 @@ Spin That Boss turns bossing with friends into a shared challenge. Let the wheel
 
 ## Getting started
 
-1. Enable RuneLite's **Party** plugin. Create a party and share its passphrase with your friends.
-2. Have everyone join the same party and enable **Spin That Boss** and RuneLite's built-in **Loot Tracker**.
-3. Open the Spin That Boss sidebar. The host clicks **Setup run**, chooses bosses and a goal, then clicks **Create party and invite friends**. Share the displayed RuneLite Party passphrase so friends can join.
+1. Have everyone enable **Spin That Boss** and RuneLite's built-in **Loot Tracker**.
+2. Open the Spin That Boss sidebar. The host clicks **Setup run**, chooses bosses and a goal, then clicks **Create party and invite friends**. Share the displayed passphrase with friends.
+3. Friends enter the passphrase in Spin That Boss and click **Join party with code**. The built-in RuneLite Party panel is not needed for creating or joining the contest party.
 4. Once at least one friend has joined, click **Start run**, then **Spin the wheel** to pick the first boss.
 5. Go bossing! Once the goal is met, the host can spin for the next round or use **End run** to finish.
 
-The boss list is locked when the match starts. Only the host can spin or end the match. Keep everyone on the same plugin version, and rejoin the same party to pick up a saved match.
+The boss list is locked when the match starts. Only the host can spin or end the match. Keep everyone on the same plugin version. Leaving the party pauses your own tracking; rejoin the same passphrase to resume.
 
 Run choices live in the Spin That Boss sidebar. The plugin settings contain only the optional Wise Old Man baseline toggle.
 

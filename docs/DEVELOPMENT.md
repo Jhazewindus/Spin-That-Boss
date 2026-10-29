@@ -18,7 +18,7 @@ The automated suite covers shuffle-bag invariants, all seven leg goals, malforme
 
 The client needs a graphical desktop. For Jagex accounts, follow RuneLite's [Using Jagex Accounts](https://github.com/runelite/runelite/wiki/Using-Jagex-Accounts) instructions.
 
-Enable RuneLite's built-in **Party** plugin and have the test players join the same party. Do not automate game input; in-game validation must be performed manually.
+Use the plugin's party setup controls to create or join the RuneLite party. Do not automate game input; in-game validation must be performed manually.
 
 ## Match synchronization
 

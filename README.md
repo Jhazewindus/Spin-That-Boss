@@ -44,7 +44,7 @@ The setup menu shows **Kills needed** or **Loot value needed (GP)** when that go
 
 For a unique-drop goal, choose **Any unique drop** or a particular collection-log drop from the dropdown. The choices are based on OSRS Wiki drop tables and refreshed boss collection-log data. The data source is [Bossman Mode's public boss ladder](https://github.com/erikrahm/osrs-runelite-bossman-mode/blob/main/src/main/resources/bossman/ladder.json); item names and game data are from the [OSRS Wiki](https://oldschool.runescape.wiki/).
 
-The starting goal is **first to kill target**. Use **Test spin** to preview the result in a popup without starting a run. A live spin displays the selected boss in the sidebar.
+The starting goal is **first to kill target**. Use **Test spin** to preview the result without starting a run. The animated wheel includes every selected boss; the popup also lists the full selection and names the winner. Live spins use the same wheel, then display the boss in the sidebar.
 
 ```text
 Zulrah: Tanzanite fang | Magic fang | Serpentine visage

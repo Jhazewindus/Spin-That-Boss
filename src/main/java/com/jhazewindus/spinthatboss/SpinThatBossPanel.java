@@ -5,6 +5,10 @@ import java.awt.CardLayout;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridLayout;
+import java.awt.Color;
+import java.awt.Image;
+import java.awt.FlowLayout;
+import java.awt.image.BufferedImage;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -46,7 +50,8 @@ final class SpinThatBossPanel extends PluginPanel
 	private final JLabel matchLabel = new JLabel("No run running", SwingConstants.CENTER);
 	private final JLabel bossLabel = new JLabel("Current boss: —");
 	private final JLabel goalLabel = new JLabel("Goal: —");
-	private final JTextArea players = new JTextArea(8, 22);
+	private final JPanel playerCards = new JPanel();
+	private final JScrollPane playerCardsScroll = new JScrollPane(playerCards);
 	private final JTextArea history = new JTextArea(6, 22);
 	private final JButton setupButton = new JButton("Setup run");
 	private final JButton spinButton = new JButton("Spin the wheel");
@@ -100,15 +105,13 @@ final class SpinThatBossPanel extends PluginPanel
 		header.add(goalLabel);
 		view.add(header, BorderLayout.NORTH);
 
-		players.setEditable(false);
-		players.setLineWrap(true);
-		players.setWrapStyleWord(true);
+		playerCards.setLayout(new BoxLayout(playerCards, BoxLayout.Y_AXIS));
 		history.setEditable(false);
 		history.setLineWrap(true);
 		history.setWrapStyleWord(true);
 		JPanel details = new JPanel(new BorderLayout(4, 4));
 		details.add(new JLabel("Party cards"), BorderLayout.NORTH);
-		details.add(new JScrollPane(players), BorderLayout.CENTER);
+		details.add(playerCardsScroll, BorderLayout.CENTER);
 		JPanel historyPanel = new JPanel(new BorderLayout(4, 4));
 		historyPanel.add(new JLabel("Run history"), BorderLayout.NORTH);
 		historyPanel.add(new JScrollPane(history), BorderLayout.CENTER);
@@ -331,6 +334,11 @@ final class SpinThatBossPanel extends PluginPanel
 
 	void showState(MatchState state, String playerSummary, String matchHistory, boolean inParty, boolean isHost)
 	{
+		showState(state, playerSummary, matchHistory, inParty, isHost, new ArrayList<>());
+	}
+
+	void showState(MatchState state, String playerSummary, String matchHistory, boolean inParty, boolean isHost, List<PlayerCardData> cards)
+	{
 		this.inParty = inParty;
 		partyLabel.setText(inParty ? "RuneLite party connected" : "Join a party in RuneLite's Party panel");
 		if (state == null)
@@ -338,7 +346,8 @@ final class SpinThatBossPanel extends PluginPanel
 			matchLabel.setText("No run running");
 			bossLabel.setText("Current boss: —");
 			goalLabel.setText("Goal: —");
-			players.setText("Set up a run to choose your bosses and goal.");
+			playerCards.removeAll();
+			playerCards.add(new JLabel("Set up a run to choose your bosses and goal."));
 			history.setText("");
 			setupButton.setEnabled(true);
 			if (inParty && inviteCode.getText().isEmpty()) inviteCode.setText("Party connected — share its passphrase");
@@ -357,7 +366,17 @@ final class SpinThatBossPanel extends PluginPanel
 			lastShownLeg = state.legNumber;
 			WheelSpinDialog.show(this, state.bossPool, state.currentBoss, "Spin That Boss");
 		}
-		players.setText(playerSummary);
+		playerCards.removeAll();
+		if (cards.isEmpty())
+		{
+			playerCards.add(new JLabel(playerSummary));
+		}
+		else
+		{
+			for (PlayerCardData card : cards) playerCards.add(makePlayerCard(card));
+		}
+		playerCards.revalidate();
+		playerCards.repaint();
 		history.setText(matchHistory);
 		setupButton.setEnabled(state.ended);
 		spinButton.setEnabled(inParty && isHost && !state.ended && (state.currentBoss == null || state.legComplete));
@@ -366,6 +385,42 @@ final class SpinThatBossPanel extends PluginPanel
 		{
 			closeSetup();
 		}
+	}
+
+	private JPanel makePlayerCard(PlayerCardData data)
+	{
+		JPanel card = new JPanel(new BorderLayout(9, 4));
+		card.setBorder(BorderFactory.createCompoundBorder(
+			BorderFactory.createMatteBorder(0, 4, 0, 0, data.color),
+			BorderFactory.createEmptyBorder(8, 7, 8, 6)));
+		card.setBackground(new Color(48, 48, 48));
+		JLabel avatar = new JLabel();
+		if (data.avatar != null)
+		{
+			avatar.setIcon(new javax.swing.ImageIcon(data.avatar.getScaledInstance(44, 44, Image.SCALE_SMOOTH)));
+		}
+		else
+		{
+			avatar.setText(data.name.substring(0, 1).toUpperCase(Locale.ROOT));
+			avatar.setHorizontalAlignment(SwingConstants.CENTER);
+			avatar.setOpaque(true);
+			avatar.setBackground(data.color);
+			avatar.setForeground(Color.WHITE);
+			avatar.setFont(avatar.getFont().deriveFont(Font.BOLD, 20f));
+			avatar.setPreferredSize(new Dimension(44, 44));
+		}
+		JLabel name = new JLabel(data.name);
+		name.setForeground(data.color);
+		name.setFont(name.getFont().deriveFont(Font.BOLD, 14f));
+		JLabel details = new JLabel("<html>" + data.details.replace("\n", "<br>") + "</html>");
+		JPanel text = new JPanel(new BorderLayout(0, 3));
+		text.setOpaque(false);
+		text.add(name, BorderLayout.NORTH);
+		text.add(details, BorderLayout.CENTER);
+		card.add(avatar, BorderLayout.WEST);
+		card.add(text, BorderLayout.CENTER);
+		card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 100));
+		return card;
 	}
 
 	private static String goalDescription(MatchState state)

@@ -21,6 +21,7 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.PartyChanged;
+import net.runelite.client.events.PartyMemberAvatar;
 import net.runelite.api.events.NpcSpawned;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.loottracker.LootReceived;
@@ -160,6 +161,12 @@ public class SpinThatBossPlugin extends Plugin
 		{
 			requestMatchSync();
 		}
+	}
+
+	@Subscribe
+	public synchronized void onPartyMemberAvatar(PartyMemberAvatar event)
+	{
+		refreshPanel();
 	}
 
 	@Subscribe
@@ -801,13 +808,39 @@ public class SpinThatBossPlugin extends Plugin
 		}
 		String playerText = playerSummary.length() == 0 ? "Waiting for progress…" : playerSummary.toString().trim();
 		String historyText = historySummary.length() == 0 ? "No completed boss legs yet." : historySummary.toString();
+		List<PlayerCardData> cards = new ArrayList<>();
+		Color[] colors = {new Color(231, 168, 65), new Color(93, 164, 224), new Color(148, 205, 120),
+			new Color(211, 130, 200), new Color(230, 112, 98), new Color(104, 203, 190)};
+		if (match != null)
+		{
+			for (String memberName : match.memberNames)
+			{
+				PlayerProgress progress = match.progress.get(memberName);
+				if (progress == null) continue;
+				String name = displayName(progress);
+				String details = String.format(Locale.ROOT, "Total %d kills · %d this leg\n%,d GP in drops",
+					progress.kills, progress.currentLegKills, progress.currentLegDropValue);
+				if (!progress.currentLegRareDrops.isEmpty()) details += "\nUnique: " + String.join(", ", progress.currentLegRareDrops);
+				else details += "\nUnique: waiting for a drop";
+				if (progress.currentLegHasPet) details += "\nPet this leg";
+				if (progress.hasPet) details += " · Pet collected";
+				if (progress.mostValuableDropName != null)
+					details += "\nBest drop: " + progress.mostValuableDropName + " (" + String.format(Locale.ROOT, "%,d", progress.mostValuableDrop) + " GP)";
+				if (progress.fastestKillMillis > 0)
+				details += "\nFastest: " + String.format(Locale.ROOT, "%.1f", progress.fastestKillMillis / 1000.0) + "s";
+				PartyMember partyMember = partyService.getMemberByDisplayName(name);
+				java.awt.image.BufferedImage avatar = partyMember == null ? null : partyMember.getAvatar();
+				Color color = colors[Math.floorMod(memberName.hashCode(), colors.length)];
+				cards.add(new PlayerCardData(name, details, color, avatar));
+			}
+		}
 		SpinThatBossPanel targetPanel = panel;
 		MatchState snapshot = isMatchInParty() ? gson.fromJson(gson.toJson(match), MatchState.class) : null;
 		SwingUtilities.invokeLater(() ->
 		{
 			if (panel == targetPanel)
 			{
-				targetPanel.showState(snapshot, playerText, historyText, inParty, host);
+				targetPanel.showState(snapshot, playerText, historyText, inParty, host, cards);
 			}
 		});
 	}
